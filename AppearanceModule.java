@@ -1,5 +1,6 @@
 package dev.tuclient.module.impl;
 
+import dev.tuclient.module.Category;
 import dev.tuclient.module.ClientModule;
 import dev.tuclient.setting.BooleanSetting;
 import dev.tuclient.setting.ModeSetting;
@@ -18,7 +19,7 @@ public class AppearanceModule extends ClientModule {
     private final BooleanSetting shadow = register(new BooleanSetting("shadow", "Sombra del texto", true));
 
     public AppearanceModule() {
-        super("appearance", "Apariencia", "Colores y estilo de todo el cliente.", true);
+        super("appearance", "Apariencia", "Colores y estilo de todo el cliente.", Category.SETTINGS, true);
     }
 
     @Override

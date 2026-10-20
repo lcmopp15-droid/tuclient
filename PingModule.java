@@ -8,7 +8,7 @@ public class PingModule extends HudModule {
 
     public PingModule() {
         super("ping", "Ping", "Tu latencia con el servidor.", false);
-        setDefaultPosition(6, 86);
+        setDefaultPosition(170, 6);
     }
 
     @Override

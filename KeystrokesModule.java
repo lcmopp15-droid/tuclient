@@ -25,7 +25,7 @@ public class KeystrokesModule extends HudModule {
 
     public KeystrokesModule() {
         super("keystrokes", "Keystrokes", "Muestra las teclas WASD, los clics y el espacio.", true);
-        setDefaultPosition(6, 128);
+        setDefaultPosition(6, 90);
     }
 
     @Override

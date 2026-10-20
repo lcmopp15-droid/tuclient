@@ -1,0 +1,18 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "dev.tuclient.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [],
+  "client": [
+    "MouseMixin",
+    "GameRendererMixin",
+    "AbstractClientPlayerEntityMixin",
+    "HeldItemRendererMixin",
+    "InGameOverlayRendererMixin",
+    "InGameHudMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

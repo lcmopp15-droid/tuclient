@@ -3,6 +3,7 @@ package dev.tuclient;
 import dev.tuclient.config.ConfigManager;
 import dev.tuclient.gui.ClickGuiScreen;
 import dev.tuclient.module.ModuleManager;
+import dev.tuclient.module.impl.ComboModule;
 import dev.tuclient.module.impl.ReachModule;
 import dev.tuclient.module.impl.ZoomModule;
 import net.fabricmc.api.ClientModInitializer;
@@ -20,7 +21,7 @@ import org.slf4j.LoggerFactory;
 
 public class TuClient implements ClientModInitializer {
 
-    public static final String MOD_ID = "tuclient";
+    public static final String MOD_ID = "tungtungclient";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     private static KeyBinding menuKey;
@@ -51,19 +52,21 @@ public class TuClient implements ClientModInitializer {
                     client.setScreen(new ClickGuiScreen());
                 }
             }
+            ModuleManager.tick(client);
         });
 
-        // 3) Dibujar los módulos del HUD
+        // 3) Dibujar el HUD y la mira
         HudRenderCallback.EVENT.register((ctx, tickDelta) -> ModuleManager.renderHud(ctx));
 
-        // 4) Registrar el alcance de cada golpe
+        // 4) Registrar cada golpe (reach y combo)
         AttackEntityCallback.EVENT.register((player, world, hand, entity, hit) -> {
             if (world.isClient && player == MinecraftClient.getInstance().player) {
                 ReachModule.registerHit(player, entity);
+                ComboModule.registerHit();
             }
             return ActionResult.PASS;
         });
 
-        LOGGER.info("TuClient cargado");
+        LOGGER.info("TungTungClient cargado");
     }
 }

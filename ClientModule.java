@@ -2,6 +2,8 @@ package dev.tuclient.module;
 
 import com.google.gson.JsonObject;
 import dev.tuclient.setting.Setting;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,19 +14,29 @@ public abstract class ClientModule {
     private final String id;
     private final String name;
     private final String description;
+    private final Category category;
     private boolean enabled;
     private final List<Setting> settings = new ArrayList<>();
 
-    protected ClientModule(String id, String name, String description, boolean enabledByDefault) {
+    protected ClientModule(String id, String name, String description, Category category, boolean enabledByDefault) {
         this.id = id;
         this.name = name;
         this.description = description;
+        this.category = category;
         this.enabled = enabledByDefault;
     }
 
     protected <T extends Setting> T register(T setting) {
         settings.add(setting);
         return setting;
+    }
+
+    /** Se llama en cada tick del juego (también si el módulo está apagado). */
+    public void onTick(MinecraftClient client) {
+    }
+
+    /** Dibujo extra en pantalla para módulos que no son del HUD (por ejemplo la mira). */
+    public void renderOverlay(DrawContext ctx) {
     }
 
     public String getId() {
@@ -37,6 +49,10 @@ public abstract class ClientModule {
 
     public String getDescription() {
         return description;
+    }
+
+    public Category getCategory() {
+        return category;
     }
 
     public boolean isEnabled() {

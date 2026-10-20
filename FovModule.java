@@ -1,5 +1,6 @@
 package dev.tuclient.module.impl;
 
+import dev.tuclient.module.Category;
 import dev.tuclient.module.ClientModule;
 import dev.tuclient.setting.BooleanSetting;
 import dev.tuclient.setting.NumberSetting;
@@ -12,7 +13,8 @@ public class FovModule extends ClientModule {
     private final BooleanSetting staticFov = register(new BooleanSetting("static", "FOV estático", true));
 
     public FovModule() {
-        super("fov", "Control de FOV", "Tu propio FOV, sin cambios al correr ni con efectos de velocidad.", false);
+        super("fov", "Control de FOV", "Tu propio FOV, sin cambios al correr ni con efectos de velocidad.",
+                Category.VISUAL, false);
     }
 
     /** Si es true, se quitan los cambios de FOV por sprint y velocidad. */

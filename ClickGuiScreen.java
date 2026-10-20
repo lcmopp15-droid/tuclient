@@ -11,41 +11,54 @@ import dev.tuclient.util.Draw;
 import dev.tuclient.util.Theme;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Menú principal: lista de módulos a la izquierda y sus ajustes a la derecha.
- * Clic en el interruptor = activar/desactivar. Clic en el nombre = ver sus ajustes.
+ * Menú principal de TungTungClient: banner animado, pestañas por categoría,
+ * tarjetas de módulos a la izquierda y ajustes del módulo elegido a la derecha.
  */
 public class ClickGuiScreen extends Screen {
 
-    private static final int W = 340;
-    private static final int H = 236;
-    private static final int HEADER = 30;
-    private static final int SIDE = 120;
-    private static final int ROW = 22;
-    private static final int PAD = 10;
-    private static final int SETTINGS_Y = 46;
+    private static final int W = 440;
+    private static final int H = 290;
+    private static final int BANNER = 50;
+    private static final int TAB_Y = BANNER + 6;
+    private static final int TAB_H = 16;
+    private static final int CONTENT_Y = BANNER + 28;
+    private static final int PADX = 12;
+    private static final int PANE_W = 150;
+    private static final int PANE_HEAD = 46;
+    private static final int CARD_H = 40;
+    private static final int GAP = 8;
     private static final int HUD_BTN_W = 78;
+
     private static final int SEPARATOR = 0x1AFFFFFF;
+    private static final int CARD_HOVER = 0xFF2B3141;
+    private static final String[] TAB_NAMES = {"Todos", "HUD", "Visual", "Juego", "Ajustes"};
 
     private final Map<Object, Float> anims = new HashMap<>();
+    private final long openedAt = System.currentTimeMillis();
     private ClientModule selected;
     private NumberSetting draggingNumber;
-    private float scroll;
+    private int tab;
+    private float gridScroll;
+    private float paneScroll;
 
+    private float ease;
     private int winX, winY, winW, winH;
-    private int listX, listY, listW, listH;
-    private int paneX, paneY, paneW;
+    private int gridX, gridY, gridW, gridH, cardW;
+    private int paneX, paneY, paneW, paneH;
 
     public ClickGuiScreen() {
-        super(Text.literal("TuClient"));
+        super(Text.literal("TungTungClient"));
         List<ClientModule> mods = ModuleManager.all();
         if (!mods.isEmpty()) {
             selected = mods.get(0);
@@ -57,30 +70,80 @@ public class ClickGuiScreen extends Screen {
         return false;
     }
 
+    // ---------------------------------------------------------------- layout
+
     private void layout() {
+        float t = Math.min(1f, (System.currentTimeMillis() - openedAt) / 240f);
+        ease = 1f - (1f - t) * (1f - t) * (1f - t);
+
         winW = Math.min(W, this.width - 10);
         winH = Math.min(H, this.height - 10);
         winX = (this.width - winW) / 2;
-        winY = (this.height - winH) / 2;
-        listX = winX + 6;
-        listY = winY + HEADER + 6;
-        listW = SIDE - 12;
-        listH = winH - HEADER - 12;
-        paneX = winX + SIDE + PAD;
-        paneY = winY + HEADER + PAD;
-        paneW = winW - SIDE - PAD * 2;
+        winY = (this.height - winH) / 2 + Math.round((1f - ease) * 16f);
+
+        paneW = PANE_W;
+        gridX = winX + PADX;
+        gridY = winY + CONTENT_Y;
+        gridW = winW - PADX * 2 - paneW - 14;
+        gridH = winY + winH - 10 - gridY;
+        cardW = (gridW - GAP) / 2;
+        paneX = winX + winW - PADX - paneW;
+        paneY = gridY;
+        paneH = gridH;
     }
 
-    private int maxScroll() {
-        return Math.max(0, ModuleManager.all().size() * ROW - listH);
+    private List<ClientModule> visible() {
+        List<ClientModule> out = new ArrayList<>();
+        for (ClientModule m : ModuleManager.all()) {
+            if (tab == 0 || m.getCategory().ordinal() == tab - 1) {
+                out.add(m);
+            }
+        }
+        return out;
+    }
+
+    private int maxGridScroll() {
+        int rows = (visible().size() + 1) / 2;
+        int total = rows * (CARD_H + GAP) - GAP;
+        return Math.max(0, total - gridH);
+    }
+
+    private static int settingHeight(Setting s) {
+        return s instanceof NumberSetting ? 28 : 22;
+    }
+
+    private int maxPaneScroll() {
+        int total = 0;
+        if (selected != null) {
+            for (Setting s : selected.getSettings()) {
+                total += settingHeight(s);
+            }
+        }
+        return Math.max(0, total - (paneH - PANE_HEAD));
+    }
+
+    private int tabX(int index) {
+        int x = winX + PADX;
+        for (int k = 0; k < index; k++) {
+            x += tabW(k) + 4;
+        }
+        return x;
+    }
+
+    private int tabW(int index) {
+        return Draw.width(TAB_NAMES[index]) + 16;
+    }
+
+    private int hudButtonX() {
+        return winX + winW - 12 - HUD_BTN_W;
     }
 
     private static boolean inRect(double mx, double my, int x, int y, int w, int h) {
         return mx >= x && mx < x + w && my >= y && my < y + h;
     }
 
-    private static int settingHeight(Setting s) {
-        return s instanceof NumberSetting ? 32 : 24;
+    private static float clamp(float v, float min, float max) {
+        return Math.max(min, Math.min(max, v));
     }
 
     // ---------------------------------------------------------------- animaciones
@@ -118,87 +181,139 @@ public class ClickGuiScreen extends Screen {
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
         layout();
         tickAnims();
-        scroll = Math.max(0, Math.min(scroll, maxScroll()));
+        gridScroll = clamp(gridScroll, 0, maxGridScroll());
+        paneScroll = clamp(paneScroll, 0, maxPaneScroll());
         int accent = Theme.accent();
 
-        ctx.fill(0, 0, this.width, this.height, 0x80000000);
+        ctx.fill(0, 0, this.width, this.height, ((int) (0x88 * ease)) << 24);
         Draw.roundRect(ctx, winX - 2, winY - 2, winW + 4, winH + 4, 8, 0x30000000);
         Draw.roundRect(ctx, winX, winY, winW, winH, 6, Theme.WINDOW);
 
-        // Cabecera
-        Draw.text(ctx, "TuClient", winX + 12, winY + 11, accent);
-        Draw.text(ctx, "v1.1", winX + 12 + Draw.width("TuClient") + 6, winY + 11, Theme.DIM);
+        renderBanner(ctx, mouseX, mouseY, accent);
+        renderTabs(ctx, mouseX, mouseY, accent);
+        renderGrid(ctx, mouseX, mouseY, accent);
 
-        int bx = hudButtonX();
-        int by = winY + 6;
-        boolean overButton = inRect(mouseX, mouseY, bx, by, HUD_BTN_W, 18);
-        Draw.roundRect(ctx, bx, by, HUD_BTN_W, 18, 5,
-                overButton ? Draw.lerp(accent, 0xFFFFFFFF, 0.2f) : accent);
-        Draw.centeredText(ctx, "Editar HUD", bx + HUD_BTN_W / 2, by + 5, 0xFFFFFFFF);
-
-        ctx.fill(winX, winY + HEADER, winX + winW, winY + HEADER + 1, SEPARATOR);
-        ctx.fill(winX + SIDE, winY + HEADER + 1, winX + SIDE + 1, winY + winH - 6, SEPARATOR);
-
-        renderList(ctx, mouseX, mouseY, accent);
-        renderPane(ctx, mouseX, mouseY, accent);
+        ctx.fill(paneX - 8, gridY, paneX - 7, gridY + gridH, SEPARATOR);
+        renderPane(ctx, accent);
 
         super.render(ctx, mouseX, mouseY, delta);
     }
 
-    private int hudButtonX() {
-        return winX + winW - 12 - HUD_BTN_W;
+    private void renderBanner(DrawContext ctx, int mouseX, int mouseY, int accent) {
+        ctx.fillGradient(winX + 2, winY + 2, winX + winW - 2, winY + BANNER,
+                Draw.withAlpha(accent, 0x70), Draw.withAlpha(accent, 0x00));
+
+        // Brillo que recorre el banner
+        int span = winW + 80;
+        int sx = winX - 40 + (int) ((System.currentTimeMillis() / 12L) % span);
+        int x1 = Math.max(sx, winX + 2);
+        int x2 = Math.min(sx + 36, winX + winW - 2);
+        if (x1 < x2) {
+            ctx.fill(x1, winY + 2, x2, winY + BANNER, 0x12FFFFFF);
+        }
+
+        // Título grande
+        MatrixStack ms = ctx.getMatrices();
+        ms.push();
+        ms.translate(winX + 14, winY + 9, 0);
+        ms.scale(2f, 2f, 1f);
+        Draw.text(ctx, "TungTungClient", 0, 0, 0xFFFFFFFF);
+        ms.pop();
+
+        Draw.roundRect(ctx, winX + 14, winY + 30, 44, 2, 1, accent);
+        int modules = Math.max(0, ModuleManager.all().size() - 1);
+        Draw.text(ctx, "v1.2  -  " + modules + " módulos", winX + 14, winY + 37, Theme.MUTED);
+
+        // Botón del editor de HUD
+        int bx = hudButtonX();
+        int by = winY + 14;
+        boolean over = inRect(mouseX, mouseY, bx, by, HUD_BTN_W, 20);
+        Draw.roundRect(ctx, bx, by, HUD_BTN_W, 20, 6, over ? Draw.lerp(accent, 0xFFFFFFFF, 0.2f) : accent);
+        Draw.centeredText(ctx, "Editar HUD", bx + HUD_BTN_W / 2, by + 6, 0xFFFFFFFF);
     }
 
-    private void renderList(DrawContext ctx, int mouseX, int mouseY, int accent) {
-        List<ClientModule> mods = ModuleManager.all();
-        ctx.enableScissor(listX, listY, listX + listW, listY + listH);
+    private void renderTabs(DrawContext ctx, int mouseX, int mouseY, int accent) {
+        for (int i = 0; i < TAB_NAMES.length; i++) {
+            int x = tabX(i);
+            int y = winY + TAB_Y;
+            int w = tabW(i);
+            boolean sel = i == tab;
+            boolean hover = inRect(mouseX, mouseY, x, y, w, TAB_H);
+            Draw.roundRect(ctx, x, y, w, TAB_H, 8, sel ? accent : (hover ? CARD_HOVER : Theme.CARD));
+            Draw.centeredText(ctx, TAB_NAMES[i], x + w / 2, y + 4, sel ? 0xFFFFFFFF : Theme.MUTED);
+        }
+    }
+
+    private String fit(String s, int width) {
+        if (Draw.width(s) <= width) {
+            return s;
+        }
+        return this.textRenderer.trimToWidth(s, width - Draw.width("...")) + "...";
+    }
+
+    private void renderGrid(DrawContext ctx, int mouseX, int mouseY, int accent) {
+        List<ClientModule> mods = visible();
+        ctx.enableScissor(gridX, gridY, gridX + gridW, gridY + gridH);
 
         for (int i = 0; i < mods.size(); i++) {
-            int ry = listY + i * ROW - (int) scroll;
-            if (ry + ROW < listY || ry > listY + listH) {
+            int cx = gridX + (i % 2) * (cardW + GAP);
+            int cy = gridY + (i / 2) * (CARD_H + GAP) - (int) gridScroll;
+            if (cy + CARD_H < gridY || cy > gridY + gridH) {
                 continue;
             }
             ClientModule m = mods.get(i);
-            boolean isSelected = m == selected;
-            boolean hover = inRect(mouseX, mouseY, listX, listY, listW, listH)
-                    && mouseY >= ry && mouseY < ry + ROW;
+            boolean sel = m == selected;
+            boolean hover = inRect(mouseX, mouseY, gridX, gridY, gridW, gridH)
+                    && inRect(mouseX, mouseY, cx, cy, cardW, CARD_H);
 
-            if (isSelected) {
-                Draw.roundRect(ctx, listX, ry, listW, ROW - 2, 4, Draw.withAlpha(accent, 0x38));
-            } else if (hover) {
-                Draw.roundRect(ctx, listX, ry, listW, ROW - 2, 4, 0x14FFFFFF);
+            int bg = sel ? Draw.lerp(Theme.CARD, accent, 0.22f) : (hover ? CARD_HOVER : Theme.CARD);
+            Draw.roundRect(ctx, cx, cy, cardW, CARD_H, 5, bg);
+            if (sel) {
+                Draw.roundRect(ctx, cx, cy + 8, 2, CARD_H - 16, 1, accent);
             }
 
-            Draw.text(ctx, m.getName(), listX + 8, ry + 6, isSelected ? Theme.TEXT : Theme.MUTED);
+            Draw.text(ctx, fit(m.getName(), cardW - 46), cx + 10, cy + 8, Theme.TEXT);
+            Draw.text(ctx, fit(m.getDescription(), cardW - 20), cx + 10, cy + 24, Theme.MUTED);
             if (m.isToggleable()) {
-                drawSwitch(ctx, listX + listW - 28, ry + 4, 22, 11, anim(m));
+                drawSwitch(ctx, cx + cardW - 32, cy + 8, 22, 11, anim(m));
             }
         }
 
         ctx.disableScissor();
+
+        // Barra de scroll
+        int max = maxGridScroll();
+        if (max > 0) {
+            int thumbH = Math.max(16, gridH * gridH / (gridH + max));
+            int thumbY = gridY + Math.round((gridH - thumbH) * (gridScroll / max));
+            Draw.roundRect(ctx, gridX + gridW + 3, thumbY, 2, thumbH, 1, Draw.withAlpha(accent, 0xAA));
+        }
     }
 
-    private void renderPane(DrawContext ctx, int mouseX, int mouseY, int accent) {
+    private void renderPane(DrawContext ctx, int accent) {
         if (selected == null) {
             return;
         }
 
         Draw.text(ctx, selected.getName(), paneX, paneY, Theme.TEXT);
         if (selected.isToggleable()) {
-            drawSwitch(ctx, paneX + paneW - 28, paneY - 3, 28, 14, anim(selected));
+            drawSwitch(ctx, paneX + paneW - 28, paneY - 2, 28, 14, anim(selected));
         }
 
         List<OrderedText> lines = this.textRenderer.wrapLines(Text.literal(selected.getDescription()), paneW);
         for (int i = 0; i < Math.min(2, lines.size()); i++) {
             ctx.drawText(this.textRenderer, lines.get(i), paneX, paneY + 14 + i * 10, Theme.MUTED, false);
         }
-        ctx.fill(paneX, paneY + 38, paneX + paneW, paneY + 39, SEPARATOR);
+        ctx.fill(paneX, paneY + PANE_HEAD - 8, paneX + paneW, paneY + PANE_HEAD - 7, SEPARATOR);
 
-        int y = paneY + SETTINGS_Y;
+        int top = paneY + PANE_HEAD;
+        ctx.enableScissor(paneX - 2, top, paneX + paneW + 2, paneY + paneH);
+        int y = top - (int) paneScroll;
         for (Setting s : selected.getSettings()) {
             renderSetting(ctx, s, y, accent);
             y += settingHeight(s);
         }
+        ctx.disableScissor();
     }
 
     private void renderSetting(DrawContext ctx, Setting s, int y, int accent) {
@@ -217,15 +332,15 @@ public class ClickGuiScreen extends Screen {
             }
             Draw.centeredText(ctx, value, bx + bw / 2 + chip / 2, y + 5, Theme.TEXT);
         } else if (s instanceof NumberSetting num) {
-            Draw.text(ctx, s.getLabel(), paneX, y + 3, Theme.TEXT);
+            Draw.text(ctx, s.getLabel(), paneX, y + 2, Theme.TEXT);
             String value = num.format();
-            Draw.text(ctx, value, paneX + paneW - Draw.width(value), y + 3, Theme.MUTED);
+            Draw.text(ctx, value, paneX + paneW - Draw.width(value), y + 2, Theme.MUTED);
 
             int fill = (int) Math.round(paneW * num.fraction());
-            Draw.roundRect(ctx, paneX, y + 20, paneW, 4, 2, Theme.OFF);
-            Draw.roundRect(ctx, paneX, y + 20, fill, 4, 2, accent);
+            Draw.roundRect(ctx, paneX, y + 16, paneW, 4, 2, Theme.OFF);
+            Draw.roundRect(ctx, paneX, y + 16, fill, 4, 2, accent);
             int knobX = Math.max(paneX, Math.min(paneX + fill - 4, paneX + paneW - 8));
-            Draw.roundRect(ctx, knobX, y + 18, 8, 8, 4, 0xFFFFFFFF);
+            Draw.roundRect(ctx, knobX, y + 14, 8, 8, 4, 0xFFFFFFFF);
         }
     }
 
@@ -242,51 +357,80 @@ public class ClickGuiScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         layout();
 
+        // Botón del editor de HUD
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT
-                && inRect(mouseX, mouseY, hudButtonX(), winY + 6, HUD_BTN_W, 18)) {
+                && inRect(mouseX, mouseY, hudButtonX(), winY + 14, HUD_BTN_W, 20)) {
             this.client.setScreen(new HudEditorScreen(this));
             return true;
         }
 
-        // Lista de módulos
-        if (inRect(mouseX, mouseY, listX, listY, listW, listH)) {
-            List<ClientModule> mods = ModuleManager.all();
-            int idx = (int) ((mouseY - listY + scroll) / ROW);
-            if (idx >= 0 && idx < mods.size()) {
+        // Pestañas
+        for (int i = 0; i < TAB_NAMES.length; i++) {
+            if (inRect(mouseX, mouseY, tabX(i), winY + TAB_Y, tabW(i), TAB_H)) {
+                tab = i;
+                gridScroll = 0;
+                List<ClientModule> mods = visible();
+                if (!mods.isEmpty() && !mods.contains(selected)) {
+                    selected = mods.get(0);
+                    paneScroll = 0;
+                }
+                return true;
+            }
+        }
+
+        // Tarjetas de módulos
+        if (inRect(mouseX, mouseY, gridX, gridY, gridW, gridH)) {
+            int localX = (int) (mouseX - gridX);
+            int localY = (int) (mouseY - gridY + gridScroll);
+            int col = localX / (cardW + GAP);
+            int row = localY / (CARD_H + GAP);
+            boolean inCard = col <= 1
+                    && localX - col * (cardW + GAP) < cardW
+                    && localY - row * (CARD_H + GAP) < CARD_H;
+            List<ClientModule> mods = visible();
+            int idx = row * 2 + col;
+            if (inCard && idx >= 0 && idx < mods.size()) {
                 ClientModule m = mods.get(idx);
-                boolean onSwitch = mouseX >= listX + listW - 32;
+                int cx = gridX + col * (cardW + GAP);
+                boolean onSwitch = mouseX >= cx + cardW - 36 && localY - row * (CARD_H + GAP) < 26;
                 if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && onSwitch && m.isToggleable()) {
                     m.toggle();
                 } else {
+                    if (selected != m) {
+                        paneScroll = 0;
+                    }
                     selected = m;
                 }
             }
             return true;
         }
 
-        // Panel derecho
+        // Panel de ajustes
         if (selected != null) {
-            if (selected.isToggleable() && inRect(mouseX, mouseY, paneX + paneW - 28, paneY - 3, 28, 14)) {
+            if (selected.isToggleable() && inRect(mouseX, mouseY, paneX + paneW - 28, paneY - 2, 28, 14)) {
                 selected.toggle();
                 return true;
             }
-            int y = paneY + SETTINGS_Y;
-            for (Setting s : selected.getSettings()) {
-                int h = settingHeight(s);
-                if (inRect(mouseX, mouseY, paneX, y, paneW, h)) {
-                    if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-                        if (s instanceof BooleanSetting b) {
-                            b.toggle();
-                        } else if (s instanceof ModeSetting ms) {
-                            ms.next();
-                        } else if (s instanceof NumberSetting n) {
-                            draggingNumber = n;
-                            updateSlider(n, mouseX);
+            int top = paneY + PANE_HEAD;
+            if (inRect(mouseX, mouseY, paneX, top, paneW, paneY + paneH - top)) {
+                int y = top - (int) paneScroll;
+                for (Setting s : selected.getSettings()) {
+                    int h = settingHeight(s);
+                    if (inRect(mouseX, mouseY, paneX, y, paneW, h)) {
+                        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                            if (s instanceof BooleanSetting b) {
+                                b.toggle();
+                            } else if (s instanceof ModeSetting ms) {
+                                ms.next();
+                            } else if (s instanceof NumberSetting n) {
+                                draggingNumber = n;
+                                updateSlider(n, mouseX);
+                            }
                         }
+                        return true;
                     }
-                    return true;
+                    y += h;
                 }
-                y += h;
             }
         }
 
@@ -311,8 +455,12 @@ public class ClickGuiScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
         layout();
-        if (inRect(mouseX, mouseY, winX, winY + HEADER, SIDE, winH - HEADER)) {
-            scroll = Math.max(0, Math.min(scroll - (float) amount * ROW, maxScroll()));
+        if (inRect(mouseX, mouseY, gridX, gridY, gridW, gridH)) {
+            gridScroll = clamp(gridScroll - (float) amount * 20f, 0, maxGridScroll());
+            return true;
+        }
+        if (inRect(mouseX, mouseY, paneX, paneY, paneW, paneH)) {
+            paneScroll = clamp(paneScroll - (float) amount * 20f, 0, maxPaneScroll());
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, amount);

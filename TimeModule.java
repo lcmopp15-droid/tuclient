@@ -16,7 +16,7 @@ public class TimeModule extends HudModule {
 
     public TimeModule() {
         super("time", "Hora", "La hora real de tu computadora.", false);
-        setDefaultPosition(6, 106);
+        setDefaultPosition(170, 26);
     }
 
     @Override

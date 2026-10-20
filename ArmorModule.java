@@ -15,7 +15,7 @@ public class ArmorModule extends HudModule {
 
     public ArmorModule() {
         super("armor", "Armadura", "Tu armadura y su durabilidad.", true);
-        setDefaultPosition(6, 214);
+        setDefaultPosition(110, 90);
     }
 
     @Override

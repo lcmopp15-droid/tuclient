@@ -22,7 +22,7 @@ public abstract class HudModule extends ClientModule {
     private int defaultY;
 
     protected HudModule(String id, String name, String description, boolean enabledByDefault) {
-        super(id, name, description, enabledByDefault);
+        super(id, name, description, Category.HUD, enabledByDefault);
     }
 
     /** Texto pequeño y gris, por ejemplo "FPS". */

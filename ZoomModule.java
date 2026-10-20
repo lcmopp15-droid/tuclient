@@ -1,5 +1,6 @@
 package dev.tuclient.module.impl;
 
+import dev.tuclient.module.Category;
 import dev.tuclient.module.ClientModule;
 import dev.tuclient.setting.BooleanSetting;
 import dev.tuclient.setting.NumberSetting;
@@ -18,7 +19,7 @@ public class ZoomModule extends ClientModule {
     private long lastFrame = System.nanoTime();
 
     public ZoomModule() {
-        super("zoom", "Zoom", "Mantén la tecla C para acercar la vista.", true);
+        super("zoom", "Zoom", "Mantén la tecla C para acercar la vista.", Category.VISUAL, true);
     }
 
     public static void setKey(KeyBinding keyBinding) {
