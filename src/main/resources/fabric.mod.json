@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "tuclient",
+  "version": "${version}",
+  "name": "TuClient",
+  "description": "Cliente ligero de visuales y HUD con ClickGUI y editor de HUD.",
+  "authors": ["Tu nombre"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["dev.tuclient.TuClient"]
+  },
+  "mixins": ["tuclient.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "1.20.1",
+    "java": ">=17",
+    "fabric-api": "*"
+  }
+}
